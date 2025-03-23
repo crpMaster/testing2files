@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing Balls Animation</title>
+    <style>
+        canvas {
+            border: 2px solid black;
+            background-color: #f0f0f0;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Ball class
+        class Ball {
+            constructor(forcedColor = null) {
+                this.radius = Math.random() * 20 + 10; // Random size between 10 and 30
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+                this.dx = (Math.random() - 0.5) * 8; // Random horizontal velocity
+                this.dy = (Math.random() - 0.5) * 8; // Random vertical velocity
+                this.colors = ['red', 'blue', 'green', 'orange', 'white'];
+                this.color = forcedColor || this.colors[Math.floor(Math.random() * this.colors.length)];
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            update() {
+                // Bounce off walls
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.dx = -this.dx;
+                }
+                if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+                    this.dy = -this.dy;
+                }
+
+                // Update position
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Check collisions with other balls
+                for (let ball of balls) {
+                    if (ball === this) continue; // Skip self
+
+                    // Calculate distance between ball centers
+                    const dx = ball.x - this.x;
+                    const dy = ball.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Check if balls are colliding
+                    if (distance < this.radius + ball.radius) {
+                        // Calculate collision angle
+                        const angle = Math.atan2(dy, dx);
+                        
+                        // Calculate velocities after collision
+                        const speed1 = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+                        const speed2 = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+                        
+                        const direction1 = Math.atan2(this.dy, this.dx);
+                        const direction2 = Math.atan2(ball.dy, ball.dx);
+                        
+                        const newDx1 = speed2 * Math.cos(direction2 - angle) * Math.cos(angle) + 
+                                     speed1 * Math.sin(direction1 - angle) * Math.cos(angle + Math.PI/2);
+                        const newDy1 = speed2 * Math.cos(direction2 - angle) * Math.sin(angle) + 
+                                     speed1 * Math.sin(direction1 - angle) * Math.sin(angle + Math.PI/2);
+                        
+                        const newDx2 = speed1 * Math.cos(direction1 - angle) * Math.cos(angle) + 
+                                     speed2 * Math.sin(direction2 - angle) * Math.cos(angle + Math.PI/2);
+                        const newDy2 = speed1 * Math.cos(direction1 - angle) * Math.sin(angle) + 
+                                     speed2 * Math.sin(direction2 - angle) * Math.sin(angle + Math.PI/2);
+                        
+                        this.dx = newDx1;
+                        this.dy = newDy1;
+                        ball.dx = newDx2;
+                        ball.dy = newDy2;
+                        
+                        // Move balls apart to prevent sticking
+                        const overlap = (this.radius + ball.radius - distance) / 2;
+                        const moveX = overlap * Math.cos(angle);
+                        const moveY = overlap * Math.sin(angle);
+                        
+                        this.x -= moveX;
+                        this.y -= moveY;
+                        ball.x += moveX;
+                        ball.y += moveY;
+                    }
+                }
+
+                this.draw();
+            }
+        }
+
+        // Create multiple balls
+        const balls = [];
+        // Add regular random-colored balls
+        for (let i = 0; i < 15; i++) {
+            balls.push(new Ball());
+        }
+        // Add 4 more green balls
+        for (let i = 0; i < 4; i++) {
+            balls.push(new Ball('green'));
+        }
+
+        // Animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            balls.forEach(ball => {
+                ball.update();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html> 
