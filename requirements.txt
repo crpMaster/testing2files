@@ -1,4 +1,5 @@
-flask==2.3.3
+flask==2.0.1
+werkzeug==2.0.3
 pysnmp==4.4.12
-flask-wtf==1.1.1
+flask-wtf==1.0.1
 bootstrap-flask==2.2.0 
