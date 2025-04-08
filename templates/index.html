@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+
+{% block title %}SNMPv3 Scanner - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4>Scan Device</h4>
+            </div>
+            <div class="card-body">
+                <form id="scan-form" method="POST">
+                    {{ form.csrf_token }}
+                    
+                    <div class="form-group mb-3">
+                        {{ form.ip_address.label }}
+                        {{ form.ip_address(class="form-control", placeholder="Enter IP address") }}
+                        {% if form.ip_address.errors %}
+                            <div class="text-danger">
+                                {% for error in form.ip_address.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        {{ form.username.label }}
+                        {{ form.username(class="form-control", placeholder="Enter SNMPv3 username") }}
+                        {% if form.username.errors %}
+                            <div class="text-danger">
+                                {% for error in form.username.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col">
+                            <div class="form-group">
+                                {{ form.auth_protocol.label }}
+                                {{ form.auth_protocol(class="form-select") }}
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="form-group">
+                                {{ form.auth_password.label }}
+                                {{ form.auth_password(class="form-control", placeholder="Auth password") }}
+                                {% if form.auth_password.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.auth_password.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col">
+                            <div class="form-group">
+                                {{ form.priv_protocol.label }}
+                                {{ form.priv_protocol(class="form-select") }}
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="form-group">
+                                {{ form.priv_password.label }}
+                                {{ form.priv_password(class="form-control", placeholder="Privacy password") }}
+                                {% if form.priv_password.errors %}
+                                    <div class="text-danger">
+                                        {% for error in form.priv_password.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary btn-block") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4>Scan Results</h4>
+            </div>
+            <div class="card-body">
+                <div id="scans-container">
+                    {% if not scan_results %}
+                        <div class="alert alert-info">No scans performed yet.</div>
+                    {% else %}
+                        {% for scan_id, result in scan_results.items() %}
+                            <div class="scan-result mb-3" id="scan-{{ scan_id }}">
+                                <div class="scan-status status-{{ scan_status[scan_id] }}">
+                                    <strong>IP:</strong> {{ result.ip_address if result.ip_address else scan_id.split('_')[0] }}
+                                    <span class="float-end">
+                                        <strong>Status:</strong> 
+                                        {{ scan_status[scan_id] }}
+                                        {% if scan_status[scan_id] == 'running' %}
+                                            <div class="loading ms-2"></div>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                
+                                {% if scan_status[scan_id] == 'completed' and result.status == 'success' %}
+                                    <div class="accordion" id="accordion-{{ scan_id }}">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#system-info-{{ scan_id }}">
+                                                    System Information
+                                                </button>
+                                            </h2>
+                                            <div id="system-info-{{ scan_id }}" class="accordion-collapse collapse show" data-bs-parent="#accordion-{{ scan_id }}">
+                                                <div class="accordion-body">
+                                                    <table class="table table-sm">
+                                                        <tbody>
+                                                            {% for name, info in result.system_info.items() %}
+                                                                <tr>
+                                                                    <td><strong>{{ name }}</strong></td>
+                                                                    <td>{{ info.value if 'value' in info else info.error if 'error' in info else '-' }}</td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#interfaces-{{ scan_id }}">
+                                                    Network Interfaces
+                                                </button>
+                                            </h2>
+                                            <div id="interfaces-{{ scan_id }}" class="accordion-collapse collapse" data-bs-parent="#accordion-{{ scan_id }}">
+                                                <div class="accordion-body">
+                                                    {% if result.interfaces and 'error' not in result.interfaces %}
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>OID</th>
+                                                                    <th>Value</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for interface in result.interfaces %}
+                                                                    <tr>
+                                                                        <td>{{ interface.oid }}</td>
+                                                                        <td>{{ interface.value }}</td>
+                                                                    </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    {% else %}
+                                                        <div class="alert alert-warning">
+                                                            {{ result.interfaces.error if result.interfaces and 'error' in result.interfaces else 'No interface data available.' }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% elif scan_status[scan_id] == 'failed' or (result.status and result.status == 'error') %}
+                                    <div class="alert alert-danger mt-2">
+                                        {{ result.message if result.message else 'Error occurred during scan' }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('scan-form');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Create FormData object
+            const formData = new FormData(form);
+            
+            // Disable submit button and show loading
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading me-2"></span> Scanning...';
+            
+            // Send AJAX request
+            fetch('/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Create placeholder for new scan
+                    const scansContainer = document.getElementById('scans-container');
+                    const ipAddress = document.getElementById('ip_address').value;
+                    
+                    // Remove "No scans" message if it exists
+                    const noScansMsg = scansContainer.querySelector('.alert-info');
+                    if (noScansMsg) {
+                        noScansMsg.remove();
+                    }
+                    
+                    // Add new scan result placeholder
+                    const scanResultHtml = `
+                        <div class="scan-result mb-3" id="scan-${data.scan_id}">
+                            <div class="scan-status status-running">
+                                <strong>IP:</strong> ${ipAddress}
+                                <span class="float-end">
+                                    <strong>Status:</strong> running
+                                    <div class="loading ms-2"></div>
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    scansContainer.insertAdjacentHTML('afterbegin', scanResultHtml);
+                    
+                    // Start polling for updates
+                    pollScanStatus(data.scan_id);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while submitting the form');
+            })
+            .finally(() => {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            });
+        });
+        
+        // Function to poll scan status
+        function pollScanStatus(scanId) {
+            const scanInterval = setInterval(() => {
+                fetch(`/scan_status/${scanId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const scanElement = document.getElementById(`scan-${scanId}`);
+                        
+                        if (data.status === 'completed' || data.status === 'failed') {
+                            // Update status
+                            scanElement.querySelector('.scan-status').className = `scan-status status-${data.status}`;
+                            scanElement.querySelector('.scan-status span').innerHTML = `<strong>Status:</strong> ${data.status}`;
+                            
+                            // If completed successfully, update with results
+                            if (data.status === 'completed' && data.result.status === 'success') {
+                                const resultHtml = `
+                                    <div class="accordion" id="accordion-${scanId}">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#system-info-${scanId}">
+                                                    System Information
+                                                </button>
+                                            </h2>
+                                            <div id="system-info-${scanId}" class="accordion-collapse collapse show" data-bs-parent="#accordion-${scanId}">
+                                                <div class="accordion-body">
+                                                    <table class="table table-sm">
+                                                        <tbody>
+                                                            ${Object.entries(data.result.system_info).map(([name, info]) => `
+                                                                <tr>
+                                                                    <td><strong>${name}</strong></td>
+                                                                    <td>${info.value ? info.value : info.error ? info.error : '-'}</td>
+                                                                </tr>
+                                                            `).join('')}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#interfaces-${scanId}">
+                                                    Network Interfaces
+                                                </button>
+                                            </h2>
+                                            <div id="interfaces-${scanId}" class="accordion-collapse collapse" data-bs-parent="#accordion-${scanId}">
+                                                <div class="accordion-body">
+                                                    ${data.result.interfaces && !data.result.interfaces.error ? `
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>OID</th>
+                                                                    <th>Value</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                ${data.result.interfaces.map(iface => `
+                                                                    <tr>
+                                                                        <td>${iface.oid}</td>
+                                                                        <td>${iface.value}</td>
+                                                                    </tr>
+                                                                `).join('')}
+                                                            </tbody>
+                                                        </table>
+                                                    ` : `
+                                                        <div class="alert alert-warning">
+                                                            ${data.result.interfaces && data.result.interfaces.error ? data.result.interfaces.error : 'No interface data available.'}
+                                                        </div>
+                                                    `}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                
+                                scanElement.insertAdjacentHTML('beforeend', resultHtml);
+                            } else if (data.status === 'failed' || (data.result.status && data.result.status === 'error')) {
+                                // Show error message
+                                const errorMsg = data.result.message || 'Error occurred during scan';
+                                scanElement.insertAdjacentHTML('beforeend', `
+                                    <div class="alert alert-danger mt-2">
+                                        ${errorMsg}
+                                    </div>
+                                `);
+                            }
+                            
+                            // Stop polling
+                            clearInterval(scanInterval);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error polling scan status:', error);
+                        clearInterval(scanInterval);
+                    });
+            }, 2000); // Poll every 2 seconds
+        }
+    });
+</script>
+{% endblock %} 

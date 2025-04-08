@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SNMPv3 Scanner{% endblock %}</title>
+    {{ bootstrap.load_css() }}
+    <style>
+        .container {
+            max-width: 1200px;
+            margin-top: 30px;
+        }
+        .result-card {
+            margin-top: 20px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            border-top-color: #007bff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .scan-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status-running {
+            background-color: #cce5ff;
+        }
+        .status-completed {
+            background-color: #d4edda;
+        }
+        .status-failed {
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">SNMPv3 Scanner</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    {{ bootstrap.load_js() }}
+    {% block scripts %}{% endblock %}
+</body>
+</html> 
