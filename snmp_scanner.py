@@ -1,4 +1,4 @@
-from pysnmp.hlapi import *
+from pysnmp_lextudio.hlapi import *
 import socket
 import time
 
