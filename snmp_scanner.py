@@ -1,4 +1,4 @@
-from easysnmp import Session
+from pysnmp_lextudio.hlapi import *
 import socket
 import time
 
@@ -7,23 +7,10 @@ class SNMPScanner:
         self.ip_address = ip_address
         self.port = port
         self.username = username
-        self.auth_protocol = auth_protocol.lower()
+        self.auth_protocol = auth_protocol
         self.auth_password = auth_password
-        self.priv_protocol = priv_protocol.lower()
+        self.priv_protocol = priv_protocol
         self.priv_password = priv_password
-        
-        # Create SNMP session
-        self.session = Session(
-            hostname=ip_address,
-            version=3,
-            security_level='authPriv',
-            security_username=username,
-            auth_protocol=self.auth_protocol,
-            auth_password=auth_password,
-            privacy_protocol=self.priv_protocol,
-            privacy_password=priv_password,
-            port=port
-        )
         
         # Common OIDs for system information
         self.system_oids = {
@@ -42,21 +29,71 @@ class SNMPScanner:
             'ifTable': '1.3.6.1.2.1.2.2'
         }
     
+    def _get_auth_protocol(self):
+        """Convert auth protocol string to SNMP protocol object"""
+        if self.auth_protocol.lower() == 'md5':
+            return usmHMACMD5AuthProtocol
+        elif self.auth_protocol.lower() == 'sha':
+            return usmHMACSHAAuthProtocol
+        else:
+            raise ValueError(f"Unsupported auth protocol: {self.auth_protocol}")
+    
+    def _get_priv_protocol(self):
+        """Convert privacy protocol string to SNMP protocol object"""
+        if self.priv_protocol.lower() == 'des':
+            return usmDESPrivProtocol
+        elif self.priv_protocol.lower() == 'aes':
+            return usmAesCfb128Protocol
+        else:
+            raise ValueError(f"Unsupported privacy protocol: {self.priv_protocol}")
+    
     def _snmp_get(self, oid):
         """Perform SNMP GET operation for a single OID"""
-        try:
-            result = self.session.get(oid)
-            return {'oid': result.oid, 'value': result.value}
-        except Exception as e:
-            return {'error': str(e)}
+        errorIndication, errorStatus, errorIndex, varBinds = next(
+            getCmd(SnmpEngine(),
+                  UsmUserData(self.username,
+                             authKey=self.auth_password,
+                             privKey=self.priv_password,
+                             authProtocol=self._get_auth_protocol(),
+                             privProtocol=self._get_priv_protocol()),
+                  UdpTransportTarget((self.ip_address, self.port)),
+                  ContextData(),
+                  ObjectType(ObjectIdentity(oid)))
+        )
+        
+        if errorIndication:
+            return {'error': str(errorIndication)}
+        elif errorStatus:
+            return {'error': f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or '?'}"}
+        else:
+            for varBind in varBinds:
+                return {'oid': str(varBind[0]), 'value': str(varBind[1])}
     
     def _snmp_walk(self, oid):
         """Perform SNMP WALK operation starting from a base OID"""
-        try:
-            results = self.session.walk(oid)
-            return [{'oid': item.oid, 'value': item.value} for item in results]
-        except Exception as e:
-            return {'error': str(e)}
+        results = []
+        for (errorIndication,
+             errorStatus,
+             errorIndex,
+             varBinds) in nextCmd(SnmpEngine(),
+                                UsmUserData(self.username,
+                                          authKey=self.auth_password,
+                                          privKey=self.priv_password,
+                                          authProtocol=self._get_auth_protocol(),
+                                          privProtocol=self._get_priv_protocol()),
+                                UdpTransportTarget((self.ip_address, self.port)),
+                                ContextData(),
+                                ObjectType(ObjectIdentity(oid)),
+                                lexicographicMode=False):
+            
+            if errorIndication:
+                return {'error': str(errorIndication)}
+            elif errorStatus:
+                return {'error': f"{errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex)-1][0] or '?'}"}
+            else:
+                for varBind in varBinds:
+                    results.append({'oid': str(varBind[0]), 'value': str(varBind[1])})
+        return results
     
     def check_connectivity(self):
         """Check if the device is reachable via SNMP"""
