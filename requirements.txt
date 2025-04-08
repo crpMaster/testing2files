@@ -1,7 +1,6 @@
 flask==2.0.1
 werkzeug==2.0.3
-pyasn1==0.4.8
-pysnmp-lextudio==5.0.27
+easysnmp==0.2.5
 flask-wtf==1.0.1
 bootstrap-flask==2.2.0
 pycryptodomex==3.19.1 
